@@ -1,0 +1,44 @@
+Code design:
+
+In my game, a player will build a gear train in a setting that has a board, axles, and gears that are needed to build it.
+I divided my project into two major parts: game and menu.
+
+Game is the part that draws the actual game setting.
+For each of the main components of the game, such as board and gear, I made a class that contains methods to draw them. There is a Preview class that draws the displays of information and buttons in the game screen. These classes are written in the “GeaRaceGame.py” file. 
+
+Menu is the part which includes the instruction, log in, level menu, result screen, and other parts that are not part of the actual game.
+I made a class for each part of the menu, which are written in the “GeaRaceMenu.py” file.
+Each class contains methods to draw everything in that part. For instance, the Instruction class draws the four pages of instruction.
+
+There is one minor part called “customize.” This is the part that draws the game editor. The classes for this are in the “GeaRaceCustomize.py” file.
+
+All the legal functions that checks if the gears on the board are legal (how and where it is placed, whether it can run, whether there is any collision, etc) are in the Board class, which is inside the “GeaRaceMenu.py” file. 
+
+The most basic functions such as creating account file, or those that contain basic window or button size information are written in the “GeaRaceManage.py” file.
+
+The main “GeaRaceRun.py” file contains a GeaRace class that is an instance of eventBasedAnimation. This class runs the game. The solver algorithm that solves the game is inside this class. To solve the game, I used backtracking to first place the axles on the board from the input to the output axle. Then I wrote a recursive function that finds the two gears of the ratio that would produce the desired output speed. Once the match was found, I wrote more recursive functions that filled the rest of the board with gears of 1 to 1 ratio.
+
+The classes I made aren’t entirely independent. Some of them are used in combination.
+
+To move back and forth from one screen to the next, I gave the onInit function a parameter called “choice.” I called the onInit function with a choice such as “Game,” “Menu,” “Customize,” or “Instruction” which would in turn call the specific init, draw, mouse, key, and other functions that contains the necessary information to run the specific page. 
+
+
+User Interface:
+
+My game creates an account for each user. This allows the player to keep record of his progress and save his work. 
+My game has helpful features that helps the player figure out the solution and master the physics of gear. They include instruction, hint, tag, run, place axles, and solution buttons.
+My game also has a game editor. This allows the player to make his own problem by which he can better understand the physics of gear.
+The time limit prompts the player to think faster and improve his skill.
+When done building the gear train, the player can see his car running. This makes the game more meaningful and exciting.
+
+
+Similar programs:
+
+The game called “Plith” was aesthetically appealing. The time was shown graphically instead of numerically. I decided to show the time in my game graphically as well.
+However, the objective of this game was too simple: to make the red gear rotate. The player is only allowed to place one gear on each axle and the axles are already fixed on the board. I didn’t like this features because it doesn’t require too much understanding of the physics of gears to play.
+
+The game called “Connect It” had a button that linked back to the level menu. I thought that would be very useful, so I also made a button that links the game to the level menu.
+I did not like the fact that this game had no time limit. This won’t motivate the player as much.
+
+The game called “Gears & Chains Spin It 2” had many helpful features like hint. I was inspired to make several helpful features as well.
+I did not like the fact that this game has the input gear continuously rotating. I made a separate Run button that runs the gear. Being able to turn this off would less distract the player when thinking.

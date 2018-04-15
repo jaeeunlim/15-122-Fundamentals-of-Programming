@@ -1,0 +1,266 @@
+######################################################################
+import eventBasedAnimation
+from Tkinter import *
+import simpleAudio
+import random
+import copy
+
+# initFns
+def backgroundAudioInitFn(data):
+    simpleAudio.startSound("tetris.wav", async=True, loop=True)
+
+def boardInitFn(data):
+    data.emptyColor = "blue"
+    data.cellBorder = 2
+    data.boardRow = [data.emptyColor]*data.cols
+    data.board = [  list(data.boardRow),
+                    list(data.boardRow),list(data.boardRow),
+                    list(data.boardRow),list(data.boardRow),
+                    list(data.boardRow),list(data.boardRow),
+                    list(data.boardRow),list(data.boardRow),
+                    list(data.boardRow),list(data.boardRow),
+                    list(data.boardRow),list(data.boardRow),
+                    list(data.boardRow),list(data.boardRow)     ]
+
+def fallingPieceInitFn(data):
+    #Seven "standard" pieces (tetrominoes)
+    iPiece = [[ True,  True,  True,  True]]
+    jPiece = [[ True, False, False ],[ True, True,  True]]  
+    lPiece = [[ False, False, True],[ True,  True,  True]]
+    oPiece = [[ True, True],[ True, True]]  
+    sPiece = [[ False, True, True],[ True,  True, False ]]  
+    tPiece = [[ False, True, False ],[ True,  True, True]]
+    zPiece = [[ True,  True, False ],[ False, True, True]]
+    # put pieces into a list
+    tetrisPieces = [ iPiece, jPiece, lPiece, oPiece, sPiece, tPiece, zPiece ]
+    tetrisPieceColors = [   "red",  "yellow",  "magenta",   
+                            "pink", "cyan", "green", "orange"   ]
+    data.tetrisPieces = tetrisPieces
+    data.tetrisPieceColors = tetrisPieceColors
+    newFallingPiece(data)
+
+def tetrisInitFn(data):
+    data.aboutText = data.windowTitle = "TETRIS"
+    data.isGameOver = False
+    data.score = 0
+    boardInitFn(data)
+    fallingPieceInitFn(data)
+    backgroundAudioInitFn(data)
+
+
+# Creating and drawing the board
+def getCellBounds(data, row, col):
+    gridWidth = data.width - 2*data.margin
+    gridHeight = data.height - 2*data.margin
+    x0 = data.margin + (gridWidth/data.cols)*col
+    x1 = data.margin + (gridWidth/data.cols)*(col+1)
+    y0 = data.margin + (gridHeight/data.rows)*row
+    y1 = data.margin + (gridHeight/data.rows)*(row+1)
+    return (x0, y0, x1, y1)
+
+def drawCell(canvas, data, cellRow, cellCol, cellColor):
+    # draw outer black cells
+    (x0, y0, x1, y1) = getCellBounds(data, cellRow, cellCol)
+    canvas.create_rectangle(x0, y0, x1, y1, fill = "black")
+    # draw inner color cells            
+    (inX0, inY0) = (x0 + data.cellBorder, y0 + data.cellBorder)
+    (inX1, inY1) = (x1 - data.cellBorder, y1 - data.cellBorder)
+    canvas.create_rectangle(inX0, inY0, inX1, inY1, fill = cellColor)
+
+def drawBoard(canvas, data):
+    for row in xrange(data.rows):
+        for col in xrange(data.cols):
+            cellColor = data.board[row][col]
+            drawCell(canvas, data, row, col, cellColor)
+
+def drawGame(canvas, data):
+    # draw orange background
+    canvas.create_rectangle(0, 0, data.width, data.height, 
+                            fill = "orange")
+    # draw cells
+    drawBoard(canvas, data)
+
+
+#Creating and drawing the fallingPiece
+def newFallingPiece(data):
+    # randomly select a piece
+    tetrisPieceShapes = 6
+    shapeIndex = random.randint(0,tetrisPieceShapes)
+    data.fallingPiece = data.tetrisPieces[shapeIndex]
+    data.fallingPieceRows = len(data.fallingPiece)
+    data.fallingPieceCols = len(data.fallingPiece[0])
+    # randomly select piece color
+    colorIndex = random.randint(0,tetrisPieceShapes)
+    data.fallingPieceColor = data.tetrisPieceColors[colorIndex]
+    # position new piece at top row
+    data.fallingPieceRow = 0
+    data.fallingPieceCol = data.cols/2 - data.fallingPieceCols/2
+
+def drawFallingPiece(canvas, data):
+    for row in xrange(data.fallingPieceRows):
+        for col in xrange(data.fallingPieceCols):
+            if (data.fallingPiece[row][col] == True):
+                cellRow = data.fallingPieceRow + row
+                cellCol = data.fallingPieceCol + col
+                drawCell(canvas, data, cellRow, cellCol, data.fallingPieceColor)
+
+
+# Moving the fallingPiece left/right/down
+def fallingPieceIsLegal(data):
+    for row in xrange(data.fallingPieceRows):
+        for col in xrange(data.fallingPieceCols):
+            if (data.fallingPiece[row][col] == True):
+                cellRow = row + data.fallingPieceRow
+                cellCol = col + data.fallingPieceCol
+                # check if cell is on the board
+                if ((data.fallingPieceRow < 0) or (cellRow >= data.rows) or +
+                    (data.fallingPieceCol < 0) or (cellCol >= data.cols)):
+                    return False
+                # check if the board is empty
+                elif not (data.board[cellRow][cellCol] == data.emptyColor):
+                    return False
+    return True
+
+def moveFallingPiece(data, drow, dcol):
+    data.fallingPieceRow += drow
+    data.fallingPieceCol += dcol
+    if (fallingPieceIsLegal(data) == False):
+        data.fallingPieceRow -= drow
+        data.fallingPieceCol -= dcol
+        return False
+    return True
+
+
+# Rotating the fallingPiece
+def rotateFallingPiece(data):
+    oldFallingPiece = copy.deepcopy(data.fallingPiece)
+    centerRow = data.fallingPieceRow + data.fallingPieceRows/2
+    centerCol = data.fallingPieceCol + data.fallingPieceCols/2
+    rotatedPiece = [([False]*data.fallingPieceRows) for row in xrange(data.fallingPieceCols)]   
+    for row in xrange(data.fallingPieceRows):
+        for col in xrange(data.fallingPieceCols):
+            rotatedPiece[data.fallingPieceCols-1-col][row]=data.fallingPiece[row][col]
+    data.fallingPiece = rotatedPiece
+    data.fallingPieceRows = len(data.fallingPiece)
+    data.fallingPieceCols = len(data.fallingPiece[0])
+    data.fallingPieceRow = centerRow - data.fallingPieceRows/2
+    data.fallingPieceCol = centerCol - data.fallingPieceCols/2
+    if not fallingPieceIsLegal(data):
+        data.fallingPiece = oldFallingPiece
+        data.fallingPieceRows = len(data.fallingPiece)
+        data.fallingPieceCols = len(data.fallingPiece[0])
+        data.fallingPieceRow = centerRow - data.fallingPieceRows/2
+        data.fallingPieceCol = centerCol - data.fallingPieceCols/2
+
+
+# Dropping and Placing the fallingPiece on the Board
+def placeFallingPiece(data):
+    for row in xrange(data.fallingPieceRows):
+        for col in xrange(data.fallingPieceCols):
+            if (data.fallingPiece[row][col] == True):
+                cellRow = row + data.fallingPieceRow
+                cellCol = col + data.fallingPieceCol
+                # place on board
+                if (data.board[cellRow][cellCol] == data.emptyColor):
+                    data.board[cellRow][cellCol] = data.fallingPieceColor
+
+# make the fallingPiece fall automatically
+def tetrisStepFn(data):
+    # able step function if game is still playing
+    if (data.isGameOver == False):
+        moveFallingPiece(data, +1, 0)
+        removeFullRows(data)
+        # check if game is over
+        if (data.fallingPieceRow == 0) and not fallingPieceIsLegal(data):
+            data.isGameOver = True
+        # place on board if no further down movement can be made
+        elif (moveFallingPiece(data, +1, 0) == False):
+            placeFallingPiece(data)
+            newFallingPiece(data)   
+
+
+# removing full rows
+def removeFullRows(data):
+    oldBoard = copy.deepcopy(data.board)
+    oldBoard.reverse()
+    oldBoardRows = len(oldBoard)
+    oldBoardCols = len(oldBoard[0])
+    newBoard = [[data.emptyColor]*data.cols for rows in xrange(data.rows)]
+    newBoardRow = len(newBoard)-1
+    removedRows = 0
+    for row in xrange(oldBoardRows):
+        for col1 in xrange(oldBoardCols):
+            if (oldBoard[row][col1] == data.emptyColor):
+                for col2 in xrange(oldBoardCols):
+                    newBoard[newBoardRow][col2] = oldBoard[row][col2]
+                newBoardRow -= 1
+                break
+            else: 
+                if (col1 == oldBoardCols-1): removedRows += 1
+    data.board = newBoard
+    data.score += removedRows**2
+
+
+# desplay score
+def drawScore(canvas, data):
+    text = "Score: " + str(data.score)
+    canvas.create_text(data.margin/2, data.margin/2, text=text, anchor=W)
+
+
+# write game over
+def drawGameOver(canvas, data):
+    if (data.isGameOver == True):
+        text = "GAME\nOVER"
+        canvas.create_text( data.width/2, data.height/2, text=text, 
+                            font="Arial 80 bold", fill="red"    )
+
+
+def keyPressed(event, data):
+    if (data.isGameOver == False):
+        drow = 0
+        dcol = 0
+        if (event.keysym == "r"): tetrisInitFn(data)
+        elif (event.keysym == "Up"):      rotateFallingPiece(data)
+        elif (event.keysym == "Down"):  drow += 1
+        elif (event.keysym == "Left"):  dcol -= 1
+        elif (event.keysym == "Right"): dcol += 1
+        moveFallingPiece(data, drow, dcol)
+    # disable key function except for restart function if game is over
+    else: 
+        if (event.keysym == "r"): tetrisInitFn(data)
+
+
+def tetrisDrawFn(canvas, data):
+    drawGame(canvas, data)
+    drawFallingPiece(canvas, data)
+    drawGameOver(canvas, data)
+    drawScore(canvas, data)
+
+
+# from course notes
+def backgroundAudioQuitFn(data):
+    simpleAudio.stopSound()
+
+
+def playTetris():
+    rows = 15
+    cols = 10
+    boardMargin = 25
+    cellSide = 25
+    width = cols*cellSide + 2*boardMargin
+    height = rows*cellSide + 2*boardMargin
+    eventBasedAnimation.run(
+        initFn=tetrisInitFn,
+        drawFn=tetrisDrawFn,
+        keyFn=keyPressed,
+        stepFn=tetrisStepFn,
+        quitFn=backgroundAudioQuitFn,
+        width=width, 
+        height=height,
+        rows=rows, 
+        cols=cols, 
+        margin=boardMargin,
+        timerDelay=1000
+        )
+
+playTetris()

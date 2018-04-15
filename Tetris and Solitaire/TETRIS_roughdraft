@@ -1,0 +1,161 @@
+
+import eventBasedAnimation
+from Tkinter import *
+import random
+
+def boardInit():
+    canvas.data.emptyColor = "blue"
+    canvas.data.boardMargin = 25
+    canvas.data.cellMargin = 2
+    canvas.data.boardRow = [canvas.data.emptyColor]*canvas.data.cols
+    canvas.data.board = [list(canvas.data.boardRow),
+                        list(canvas.data.boardRow),list(canvas.data.boardRow),
+                        list(canvas.data.boardRow),list(canvas.data.boardRow),
+                        list(canvas.data.boardRow),list(canvas.data.boardRow),
+                        list(canvas.data.boardRow),list(canvas.data.boardRow),
+                        list(canvas.data.boardRow),list(canvas.data.boardRow),
+                        list(canvas.data.boardRow),list(canvas.data.boardRow),
+                        list(canvas.data.boardRow),list(canvas.data.boardRow)]
+
+    # temporary code
+    canvas.data.board[0][0] = "red" # top-left is red
+    canvas.data.board[0][canvas.data.cols-1] = "white" # top-right is white
+    canvas.data.board[canvas.data.rows-1][0] = "green" # bottom-left is green
+    canvas.data.board[canvas.data.rows-1][canvas.data.cols-1] = "gray" # bottom-right is gray
+
+def getCellBounds(row, col):
+    gridWidth = canvas.data.width - 2*canvas.data.boardMargin
+    gridHeight = canvas.data.height - 2*canvas.data.boardMargin
+    x0 = canvas.data.boardMargin + (gridWidth/canvas.data.cols)*col
+    x1 = canvas.data.boardMargin + (gridWidth/canvas.data.cols)*(col+1)
+    y0 = canvas.data.boardMargin + (gridHeight/canvas.data.rows)*row
+    y1 = canvas.data.boardMargin + (gridHeight/canvas.data.rows)*(row+1)
+    return (x0, y0, x1, y1)
+
+def drawCell(canvas, cellRow, cellCol, cellColor):
+    # draw outer black cells
+    (x0, y0, x1, y1) = getCellBounds(cellRow, cellCol)
+    canvas.create_rectangle(x0, y0, x1, y1, fill = "black")
+    # draw inner color cells            
+    (inX0, inY0) = (x0 + canvas.data.cellMargin, y0 + canvas.data.cellMargin)
+    (inX1, inY1) = (x1 - canvas.data.cellMargin, y1 - canvas.data.cellMargin)
+    canvas.create_rectangle(inX0, inY0, inX1, inY1, fill = cellColor)
+
+def drawBoard(canvas):
+    for row in xrange(canvas.data.rows):
+        for col in xrange(canvas.data.cols):
+            cellColor = canvas.data.board[row][col]
+            drawCell(canvas, row, col, cellColor)
+
+def fallingPieceInit():
+#Seven "standard" pieces (tetrominoes)
+  iPiece = [
+    [ True,  True,  True,  True]
+  ]
+  
+  jPiece = [
+    [ True, False, False ],
+    [ True, True,  True]
+  ]
+  
+  lPiece = [
+    [ False, False, True],
+    [ True,  True,  True]
+  ]
+  
+  oPiece = [
+    [ True, True],
+    [ True, True]
+  ]
+  
+  sPiece = [
+    [ False, True, True],
+    [ True,  True, False ]
+  ]
+  
+  tPiece = [
+    [ False, True, False ],
+    [ True,  True, True]
+  ]
+
+  zPiece = [
+    [ True,  True, False ],
+    [ False, True, True]
+  ]
+  canvas.data.tetrisPieces = [  iPiece, jPiece, lPiece, oPiece, 
+                                sPiece, tPiece, zPiece ]
+  canvas.data.tetrisPieceColors = [ "red", "yellow", "magenta", "pink", 
+                                    "cyan", "green", "orange" ]
+  #canvas.data["tetrisPieces"] = tetrisPieces
+  #canvas.data["tetrisPieceColors"] = tetrisPieceColors
+  # randomly select first piece
+  tetrisPieceShapes = 6
+  shapeIndex = random.randint(0,tetrisPieceShapes)
+  canvas.data.fallingPiece = canvas.data.tetrisPieces[shapeIndex]
+  # randomly select piece color
+  colorIndex = random.randint(0,tetrisPieceShapes)
+  canvas.data.fallingPieceColor = canvas.data.tetrisPieceColors[colorIndex]
+
+def newFallingPiece(pieceRow, pieceCol):
+  # randomly select a piece
+  ##tetrisPieceShapes = 6
+  ##shapeIndex = random.randint(0,tetrisPieceShapes)
+  ##canvas.data.fallingPiece = canvas.data.tetrisPieces[]
+  # randomly select piece color
+  ##colorIndex = random.randint(0,tetrisPieceShapes)
+  ##canvas.data.fallingPieceColor = canvas.data.tetrisPieceColors[colorIndex]
+  # position new piece at top row
+  fallingPieceCols = len(canvas.data.fallingPiece[0])
+  fallingPieceRow = 0
+  fallingPieceCol = canvas.data.cols/2 - fallingPieceCols/2
+  cellRow = fallingPieceRow + pieceRow
+  cellCol = fallingPieceCol + pieceCol
+  drawCell(canvas, cellRow, cellCol, canvas.data.fallingPieceColor)
+
+def drawFallingPiece(canvas):
+  for row in xrange(len(canvas.data.fallingPiece)):
+    for col in xrange(len(canvas.data.fallingPiece[0])):
+      if (canvas.data.fallingPiece[row][col] == True):
+        newFallingPiece(row, col)
+
+def drawGame(canvas):
+    # draw orange background
+    canvas.create_rectangle(0, 0, canvas.data.width, canvas.data.height, 
+                            fill = "orange")
+    # draw cells
+    drawBoard(canvas)
+    # draw falling piece
+    drawFallingPiece(canvas)
+
+def redrawAll():
+    canvas.delete(ALL)
+    drawGame(canvas)   
+
+def run(rows, cols):
+    global canvas
+    root = Tk()
+    gridSide = 25
+    width = gridSide*cols
+    height = gridSide*rows
+    canvas = Canvas(root, width=width, height=height)
+    canvas.pack()
+    root.resizable(width=0, height=0)
+    class Struct: pass
+    canvas.data = Struct()
+    canvas.data.width = gridSide*cols
+    canvas.data.height = gridSide*rows
+    canvas.data.rows = rows
+    canvas.data.cols = cols
+    boardInit()
+    fallingPieceInit()
+    redrawAll()
+    root.mainloop()
+
+def keyPressed(event):
+  # for now, for testing purposes, just choose a new falling piece
+  # whenever ANY key is pressed!
+  canvas = event.widget.canvas
+  newFallingPiece(canvas)
+  redrawAll(canvas)
+
+run(20,15)

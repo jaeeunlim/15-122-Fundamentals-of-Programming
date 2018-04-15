@@ -1,0 +1,620 @@
+# hw6.py
+# Esther Lim + jaeeunl + section R
+
+import eventBasedAnimation
+from Tkinter import *
+import random
+import copy
+
+
+# initFns:
+def solitaireInitFn(data):
+    data.aboutText = data.windowTitle = "SOLITAIRE"
+    data.suitNames = "cdhs"
+    data.totalCards = 52
+    data.pileCols = 7 # columns of card piles on board
+    data.totalRanks = 13
+    (data.x, data.y) = (0,0) # initial mouse location
+    loadPlayingCardImages(data)
+    cardDimensions(data)
+    randomInit(data)
+    newDeck(data)
+    newDiscardPile(data)
+    newFoundations(data)
+    newPlayingCards(data)
+    highlightInitFn(data)
+    selectedCardsHistory(data)
+
+def randomInit(data):
+    randomDiscardPileInit(data)
+    randomPlayCardInit(data)
+
+###############################################################################
+# from course notes (with small revision)
+def loadPlayingCardImages(data):
+    data.cardImages = [ ]
+    for card in xrange(data.totalCards+1):
+        rank = (card%data.totalRanks)+1
+        suit = "cdhsx"[card/data.totalRanks]
+        filename = "playing-card-gifs/%s%d.gif" % (suit, rank)
+        data.cardImages.append(PhotoImage(file=filename))
+    data.copyCardImages = copy.copy(data.cardImages)
+
+# from course notes (with small revision)
+def getPlayingCardImage(data, rank, suitName):
+    suitName = suitName[0].lower() # only car about first letter
+    suitNames = "cdhsx"
+    assert(1 <= rank <= data.totalRanks)
+    assert(suitName in suitNames)
+    suit = suitNames.index(suitName)
+    return data.cardImages[data.totalRanks*suit + rank - 1]
+
+# get card width and height and space between card piles
+def cardDimensions(data):
+    image = getPlayingCardImage(data, 1, "c") # measure any one card
+    data.cardWidth = image.width()
+    data.cardHeight = image.height()
+    # vertical space between card piles
+    data.verSpace=(data.width-(data.cardWidth*data.pileCols))/(data.pileCols+1)
+    # horizontal space between card piles
+    cardCount = 2 # number of cards in one column that is displayed in fullview
+    spaceCount = 21 # number of spaces between row of card piles (3) + 
+                    # max number of stacked cards not in fullview (18)
+    data.horSpace = (data.height - data.cardHeight*cardCount) / spaceCount
+
+
+###############################################################################
+# Draw board:
+# draw rectangle for deck
+def drawDeckRec(canvas, data):
+    (x0, y0) = (data.verSpace, data.horSpace)
+    (x1, y1) = (x0 + data.cardWidth, y0 + data.cardHeight)
+    canvas.create_rectangle(x0, y0, x1, y1, fill="white", outline="gray")
+
+# draw rectangles for Foundations
+def drawFoundationsRec(canvas, data):
+    for col in xrange(data.foundationStartCol, data.foundationEndCol+1):
+        (x0, y0) = ((data.verSpace*col + data.cardWidth*(col-1)), data.horSpace)
+        (x1, y1) = (x0 + data.cardWidth, y0 + data.cardHeight)
+        canvas.create_rectangle(x0, y0, x1, y1, fill="white", outline="gray")
+
+# draw rectangles for playing cards
+def drawPlayingCardRec(canvas, data):
+    startCol = 1
+    endCol = 7
+    for col in xrange(startCol, endCol+1):
+        (x0, y0) = (    (data.verSpace*col + data.cardWidth*(col-1)), 
+                        (data.horSpace*2 + data.cardHeight)     )
+        (x1, y1) = (x0 + data.cardWidth, y0 + data.cardHeight)
+        canvas.create_rectangle(x0, y0, x1, y1, fill="white", outline="gray")
+
+def drawBoard(canvas, data):
+    drawDeckRec(canvas, data)
+    drawFoundationsRec(canvas, data)
+    drawPlayingCardRec(canvas, data)
+
+#############################################################################
+# Draw deck:
+def newDeck(data):
+    data.deck = [1, "x"]
+
+def drawDeck(canvas, data):
+    rank = data.deck[0]
+    suit = data.deck[1]
+    if (rank == 0) and (suit == ""): return None # draw blank
+    else: 
+        (left, top) = (data.verSpace, data.horSpace)
+        card = getPlayingCardImage(data, rank, suit)
+        canvas.create_image(left, top, anchor=NW, image=card)
+
+def deckMouseFn(event, data):
+    leftBorder = data.verSpace
+    rightBorder = data.verSpace + data.cardWidth
+    topBorder = data.horSpace
+    bottomBorder = data.horSpace + data.cardHeight
+    if (leftBorder<data.x<rightBorder) and (topBorder<data.y<bottomBorder): 
+        newDeck(data)
+        discardPile = copy.copy(data.discardPile)
+        for card in xrange(len(data.discardPile)): #rotate discardPile
+            nextCardIndex = (card+1)%(len(data.discardPile))
+            data.discardPile[card] = discardPile[nextCardIndex]
+        if (data.discardPile[1] == [0, ""]):
+            data.deck = [0, ""] # deck becomes blank
+ 
+
+##############################################################################
+# Draw discard pile:
+def randomInit(data):
+    randomRanks(data)
+    randomSuits(data)
+
+def randomRanks(data):
+    data.totalSuits = 4
+    ranks = []
+    randomRanks = []
+    for rank in xrange(1, data.totalRanks+1):
+        ranks.append(rank)
+    while (ranks != []):
+        randomRank = random.choice(ranks)
+        randomRanks.append(randomRank)
+        ranks.remove(randomRank)
+    data.randomRanks = [randomRanks for num in xrange(data.totalSuits)]
+
+def randomSuits(data):
+    fourInTwelve = 3
+    suits = list("cdhs")
+    data.ranSuits = ([suits*fourInTwelve+["c"]] + [suits*fourInTwelve+["d"]] + 
+                     [suits*fourInTwelve+["h"]] + [suits*fourInTwelve+["s"]])
+
+def randomDiscardPileInit(data): # for cards in discard pile
+    data.discardRanks = [] # make a list of twenty-four randomly selected ranks
+    data.discardSuits = [] # make a list of randomly shuffled suits
+    data.maxDeck = 24 # max number of cards in deck
+    suits = list(data.suitNames)
+    for times in xrange(data.maxDeck):
+        rank = random.randint(1, data.totalRanks)
+        data.discardRanks.append(rank)
+        random.shuffle(suits)
+        suits = copy.copy(suits)
+        data.discardSuits.append(suits)
+
+def newDiscardPile(data):
+    data.discardPile = [[0, ""] for card in xrange(data.maxDeck+1)]
+    for card in xrange(1,data.maxDeck+1):
+        data.discardPile[card][0] = (data.discardRanks[card%data.maxDeck])
+        data.discardPile[card][1] = (data.discardSuits[card%data.maxDeck][0])
+
+def drawDiscardPile(canvas, data):
+    rank = data.discardPile[0][0]
+    suit = data.discardPile[0][1]
+    if (rank == 0) and (suit == ""): return None # draw blank
+    else:    
+        (left, top) = ((2*data.verSpace + data.cardWidth), data.horSpace)
+        card = getPlayingCardImage(data, rank, suit)
+        canvas.create_image(left, top, anchor=NW, image=card)
+
+
+#############################################################################
+# Draw cards for foundations:
+def newFoundations(data):
+    data.foundationStartCol = 4 # starts at the fourth column of the board
+    data.foundationEndCol = 7
+    data.foundationCount = 4
+    data.foundations = ([[[0, ""] for col in xrange(data.foundationCount)] 
+                        for row in xrange(data.totalRanks)])
+
+def drawFoundations(canvas, data):  
+    verSpaces = 4 # vertical spaces on the rightside
+    cards = 3 # number of card piles on the rightside
+    for row in xrange(data.totalRanks):
+        for col in xrange(data.foundationCount):
+            rank = data.foundations[row][col][0]
+            suit = data.foundations[row][col][1]
+            if (rank == 0) and (suit == ""): continue # draw blank
+            else:    
+                left=data.verSpace*(verSpaces+col)+(data.cardWidth*(cards+col))
+                top = data.horSpace
+                card = getPlayingCardImage(data, rank, suit)
+                canvas.create_image(left, top, anchor=NW, image=card)
+
+
+#############################################################################
+# Draw playing cards
+
+def randomPlayCardInit(data): # for playing cards
+    data.playCardRanks = [] # make a list of seven randomly selected ranks
+    data.playCardSuits = [] # make a list of randomly shuffled suits
+    suits = list(data.suitNames)
+    for times in xrange(data.pileCols):
+        rank = random.randint(1, data.totalRanks)
+        data.playCardRanks.append(rank)
+        random.shuffle(suits)
+        suits = copy.copy(suits)
+        data.playCardSuits.append(suits)
+
+def randomCardInit(data):
+    data.randomRanks = []
+    data.randomSuits
+
+def newPlayingCards(data):
+    # make a list of playing cards on the main board
+    data.maxStack = 19
+    playingCards = (   [[[0, ""] for col in xrange(data.pileCols)]
+                            for row in xrange(data.maxStack)]   )
+    # draw face down cards
+    for col in xrange(1, data.pileCols):
+        for row in xrange(col):
+            playingCards[row][col][0] = 1
+            playingCards[row][col][1] = "x"
+    # draw face up cards
+    for col in xrange(data.pileCols):
+        playingCards[col][col][0] = copy.copy(data.playCardRanks[col])
+        playingCards[col][col][1] = copy.copy(data.playCardSuits[col][0])
+    # store initial playing cards in data
+    data.playingCards = playingCards
+
+def drawPlayingCards(canvas, data):
+    playingCardRows = len(data.playingCards)
+    playingCardCols = len(data.playingCards[0])
+    for row in xrange(playingCardRows):
+        for col in xrange(playingCardCols):
+            rank = data.playingCards[row][col][0]
+            suit = data.playingCards[row][col][1]
+            if (rank == 0) and (suit == ""): continue # draw blank
+            else:
+                left = (data.verSpace*(col+1) + data.cardWidth*(col)) 
+                top = (data.horSpace*(row+2) + data.cardHeight)
+                card = getPlayingCardImage(data, rank, suit)
+                canvas.create_image(left, top, anchor=NW, image=card)
+
+##############################################################################
+# Highlight card when clicked
+def highlightInitFn(data):
+    # make a list of two sets of coordinates: first one is for newly selected 
+    # card and second one is previously selected card
+    data.highlightCards = [[0,0] for num in xrange(2)] 
+    data.ranksAndSuits = []
+    data.selectedCards = []
+
+def selectedCardsHistory(data):
+    data.prevSelectedCards = []
+    data.newSelectedCards = []
+
+def drawBoundary(canvas, data, x0, y0): # around one card
+    canvas.create_line(x0, y0, x0+data.cardWidth, y0, fill="green", width=2)
+    canvas.create_line(x0, y0, x0, y0+data.cardHeight, fill="green", width=2)
+    canvas.create_line( x0+data.cardWidth, y0+data.cardHeight, 
+                        x0+data.cardWidth, y0, fill="green", width=2)
+    canvas.create_line( x0+data.cardWidth, y0+data.cardHeight,
+                        x0, y0+data.cardHeight, fill="green", width=2)
+
+# draw boundary around multiple selected cards
+def drawBoundaryMultipleCards(canvas, data, x0, y0, extraCards): 
+    canvas.create_line( x0, y0, x0+data.cardWidth, y0, 
+                        fill="green", width=2)
+    canvas.create_line( x0, y0, x0, 
+                        y0+data.cardHeight+(data.horSpace*extraCards), 
+                        fill="green", width=2)
+    canvas.create_line( x0+data.cardWidth, 
+                        y0+data.cardHeight+(data.horSpace*extraCards), 
+                        x0+data.cardWidth, y0, 
+                        fill="green", width=2)
+    canvas.create_line( x0+data.cardWidth, 
+                        y0+data.cardHeight+(data.horSpace*extraCards),
+                        x0, y0+data.cardHeight+(data.horSpace*extraCards), 
+                        fill="green", width=2)
+
+def selectTwo(data, x0, y0): # store two selected cards in data
+    if (data.highlightCards[0] == data.highlightCards[1] == [0,0]): pass
+    elif (data.highlightCards.count([0, 0]) == 0):
+        highlightInitFn(data)
+    else:
+        data.highlightCards[1] = copy.copy(data.highlightCards[0])
+    data.highlightCards[0] = [x0, y0]
+
+
+def highlightTwoCards(canvas, data):
+    # undo highlight if same one selected again
+    if (data.highlightCards[0] == data.highlightCards[1]): return None
+    else: 
+        for card in data.highlightCards:
+            (x0, y0) = card
+            if not (x0 == y0 == 0):
+                drawBoundary(canvas, data, x0, y0)
+                
+def highlightMultipleCards(canvas, data):
+    if (data.selectedCards == []): return None
+    else: 
+        x0 = data.selectedCards[0]
+        y0 = data.selectedCards[1]
+        extraCards = data.selectedCards[2]
+        drawBoundaryMultipleCards(canvas, data, x0, y0, extraCards)
+
+        
+def highlightDiscardPile(data): 
+    leftBorder = 2*data.verSpace + data.cardWidth 
+    rightBorder = leftBorder + data.cardWidth
+    topBorder = data.horSpace
+    bottomBorder = data.horSpace + data.cardHeight
+    if ((leftBorder < data.x < rightBorder) 
+        and (topBorder < data.y < bottomBorder)):
+        if not (data.discardPile[0][0] == 0): #highlight only when faceup card
+            (x0, y0) = (leftBorder, topBorder)
+            selectTwo(data, x0, y0)
+            data.highlightCards[1] = [0,0]     
+
+def highlightFoundation(data):
+    verSpaces = 4 # vertical spaces on the rightside
+    cards = 3 # number of card piles on the rightside
+    for col in xrange(data.foundationCount):
+        x0 = data.verSpace*(verSpaces+col) + (data.cardWidth*(cards+col))
+        y0 = data.horSpace
+        # highlight when clicked
+        if ((x0 < data.x < x0+data.cardWidth) 
+            and (y0 < data.y < y0+data.cardHeight)):
+            selectTwo(data, x0, y0)
+
+def highlightPlay(data):
+    playingCardRows = len(data.playingCards)
+    playingCardCols = len(data.playingCards[0])
+    for col in xrange(playingCardCols-1, -1, -1):
+        for row in xrange(playingCardRows-1, -1, -1):
+            # highlight frontmost face up card
+            if ((data.playingCards[row][col] != [0, ""]) and 
+                (data.playingCards[row][col] != [1, "x"])):
+                if (data.playingCards[row+1][col] == [0, ""]):
+                    x0 = (data.verSpace*(col+1) + data.cardWidth*(col)) 
+                    y0 = (data.horSpace*(row+2) + data.cardHeight)
+                    if ((x0 < data.x < x0+data.cardWidth) and 
+                        (y0 < data.y < y0+data.cardHeight)):
+                        selectTwo(data, x0, y0)
+                    else: extraCards(data, x0, row, col)
+
+# check if extra cards are selected simultaneously
+def extraCards(data, x0, row, col):
+    for nextRow in xrange(row-1, -1, -1):
+        if ((data.playingCards[nextRow][col] != [0, ""]) and 
+            (data.playingCards[nextRow][col] != [1, "x"])):
+            y0=(data.horSpace*(nextRow+2)+data.cardHeight)
+            # highlight when clicked
+            if ((x0 < data.x < x0+data.cardWidth) and 
+                (y0 < data.y < y0+data.horSpace)):
+                extraCards = abs(nextRow-row)
+                data.prevSelectedCards = copy.copy(data.newSelectedCards)
+                data.selectedCards = [x0, y0, extraCards]
+                data.newSelectedCards = copy.copy(data.selectedCards)
+                                                
+
+def highlightMouseFn(event, data):
+    highlightDiscardPile(data)
+    highlightFoundation(data)
+    highlightPlay(data)
+
+
+#############################################################################
+# flip face down cards
+def flipCard(event, data):
+    playingCardRows = len(data.playingCards)
+    playingCardCols = len(data.playingCards[0])
+    for col in xrange(playingCardCols):
+        for row in xrange(playingCardRows):
+            if ((data.playingCards[row][col] == [1, "x"]) and 
+                (data.playingCards[row+1][col] == [0, ""])):
+                x0 = (data.verSpace*(col+1) + data.cardWidth*(col)) 
+                y0 = (data.horSpace*(row+2) + data.cardHeight)
+                # highlight when clicked
+                if ((x0 < data.x < x0+data.cardWidth) and 
+                    (y0 < data.y < y0+data.cardHeight)):
+                    data.playingCards[row][col][0]=data.playCardRanks[col]
+                    data.playingCards[row][col][1]=data.playCardSuits[col][0]
+                    highlightInitFn(data)
+                    break
+  
+
+# stacking cards
+def stackCards(event, data):
+    firstCard = data.highlightCards[1]
+    secondCard = data.highlightCards[0]
+    (x1, y1) = (firstCard[0], firstCard[1])
+    (x2, y2) = (secondCard[0], secondCard[1])
+    # if same card selected twice
+    if (firstCard == secondCard): return None
+    # moving multiple cards
+    elif (data.selectedCards != []):
+        moveMultipleCards(data, x2, y2)
+    # if two are highlighted
+    elif not(firstCard == [0,0]) and not (secondCard == [0,0]):
+        # in the case of first chosen card
+        firstPlayCard(data, x1, y1) # if from playing cards
+        firstDiscardPile(data, x1, y1) # if from discard pile
+        firstFoundation(data, x1, y1) # if from foundations
+        # in the case of second chosen card  
+        secondPlayCard(data, x2, y2, x1, y1) # if from playing cards
+        secondFoundation(data, x2, y2, x1, y1) # if from foundations
+
+def moveMultipleCards(data, x, y):
+    (x0, y0) = (data.selectedCards[0], data.selectedCards[1])
+    extraCards = data.selectedCards[2]
+    row = (y0 - (2*data.horSpace + data.cardHeight)) / data.horSpace
+    col = (x0 - data.verSpace) / (data.verSpace + data.cardWidth)
+    # undo select if click the same column again
+    if (data.prevSelectedCards != []):
+        x1, x2 = data.prevSelectedCards[0], data.newSelectedCards[0]
+        x3 = data.highlightCards[0][0]
+        if (x1 == x3) or (x1 == x2) or (x2 == x3): 
+            highlightInitFn(data)
+            data.newSelectedCards = []
+        else: repositionMultipleCards(data, x, y, row, col, extraCards)
+    else:
+        x1, x2 = data.newSelectedCards[0], data.highlightCards[0][0]
+        if (x1 == x2): 
+            highlightInitFn(data)
+            data.newSelectedCards = []
+        else: repositionMultipleCards(data, x, y, row, col, extraCards)
+    
+# helper function for moveMultipleCards(0
+def repositionMultipleCards(data, x, y, row, col, extraCards):
+    data.prevRowsAndCols = []
+    if (y > data.horSpace+data.cardHeight): # for next selected card
+        for theRow in xrange(row, row+extraCards+1):
+            data.ranksAndSuits += list([data.playingCards[theRow][col]])
+            data.prevRowsAndCols.append([theRow, col])
+        col = (x - data.verSpace)/(data.cardWidth + data.verSpace)
+        drawMultipleCards(data, col)
+    #if next selected card is not from playing cards
+    else: highlightInitFn(data)
+
+# helper function for moveMultipleCards()
+def drawMultipleCards(data, col):
+        for row in xrange(len(data.playingCards)):
+            # if face up card
+            if (not (data.playingCards[row][col] == [0, ""]) 
+                and not (data.playingCards[row][col] == [1, "x"])):
+                if (row != (data.maxStack - 1)):
+                    if (data.playingCards[row+1][col] == [0, ""]):
+                        nextRow = row
+                        for card in data.ranksAndSuits:
+                            nextRow += 1
+                            (rank, suit) = (card[0], card[1])
+                            if playCardIsLegal(data,nextRow,col,rank,suit):
+                                data.playingCards[nextRow][col] = card
+                                for item in data.prevRowsAndCols:
+                                    (theRow, theCol) = (item[0], item[1])
+                                    data.playingCards[theRow][theCol] = [0, ""]
+                                highlightInitFn(data)
+                            else: return None
+
+def firstPlayCard(data, x, y):
+    if (y > data.horSpace+data.cardHeight): # if from playing cards
+        col = (x - data.verSpace)/(data.cardWidth + data.verSpace)
+        for row in xrange(len(data.playingCards)):
+            # if face up card
+            if ((data.playingCards[row][col] != [0, ""]) 
+                and (data.playingCards[row][col] != [1, "x"])):
+                if (data.playingCards[row+1][col] == [0, ""]):
+                    (data.rank, data.suit) = data.playingCards[row][col]
+                    (data.prevRow, data.prevCol) = (row, col)              
+                    break
+
+def firstDiscardPile(data, x, y):
+    if ((y < data.horSpace+data.cardHeight) and
+        (x < 2*(data.verSpace+data.cardWidth))): # if from discard pile
+        (data.rank, data.suit) = copy.copy(data.discardPile[0])
+       
+def firstFoundation(data, x, y): # if from foundations
+    verSpaces = 4 # vertical spaces on the rightside
+    cards = 3 # number of card piles on the rightside
+    if ((y < data.horSpace+data.cardHeight) and
+        (x > 2*(data.verSpace+data.cardWidth))): 
+        numerator = (x - (verSpaces*data.verSpace + cards*data.cardWidth))
+        denominator = (data.cardWidth + data.verSpace)
+        col = numerator / denominator
+        for row in xrange(len(data.foundations)):
+            # if blank
+            if (data.foundations[row][col] != [0, ""]):
+                (data.rank, data.suit) = copy.copy(data.foundations[row][col])
+                (data.prevRow, data.prevCol) = (row, col)              
+                break
+
+def secondPlayCard(data, x2, y2, x1, y1):           
+    if (y2 > data.horSpace+data.cardHeight): # if from playing cards
+        col = (x2 - data.verSpace)/(data.cardWidth + data.verSpace)
+        if (data.playingCards[0][col] == [0, ""]): 
+            if (data.rank == data.totalRanks): 
+                data.playingCards[0][col] = [data.rank, data.suit]
+                # if card is from playing card
+                if (y1 > data.horSpace+data.cardHeight):
+                    data.playingCards[data.prevRow][data.prevCol] = [0, ""]
+                # if from foundation
+                elif ((y1 < data.horSpace+data.cardHeight) and
+                    (x1 > 2*(data.verSpace+data.cardWidth))):
+                    data.foundations[data.prevRow][data.prevCol] = [0, ""] 
+                else: # if from discard pile
+                    data.discardPile.pop(0) 
+                highlightInitFn(data)
+                (data.rank, data.suit) = (0, "")
+        else: placeSelectedCard(data, col, x1, y1)
+
+# helper function for secondPlayCard()
+def placeSelectedCard(data, col, x1, y1):
+    for row in xrange(len(data.playingCards)):
+        # if face up card
+        if (not (data.playingCards[row][col] == [0, ""]) 
+            and not (data.playingCards[row][col] == [1, "x"])):
+            if (data.playingCards[row+1][col] == [0, ""]):
+                if playCardIsLegal(data,row+1,col,data.rank,data.suit):
+                    data.playingCards[row+1][col]=[data.rank,data.suit]
+                    # if card is from playing card
+                    if (y1 > data.horSpace+data.cardHeight):
+                        data.playingCards[data.prevRow][data.prevCol] = [0, ""]
+                    # if from foundation
+                    elif ((y1 < data.horSpace+data.cardHeight) and
+                            (x1 > 2*(data.verSpace+data.cardWidth))):
+                        data.foundations[data.prevRow][data.prevCol] = [0, ""] 
+                    else: # if from discard pile
+                        data.discardPile.pop(0) 
+                    highlightInitFn(data)
+                    (data.rank, data.suit) = (0, "")
+                    break
+                else: return None
+
+def secondFoundation(data, x2, y2, x1, y1): # if from foundations
+    verSpaces = 4 # vertical spaces on the rightside
+    cards = 3 # number of card piles on the rightside
+    if ((y2 < data.horSpace+data.cardHeight) and
+        (x2 > 2*(data.verSpace+data.cardWidth))): 
+        numerator = (x2 - (verSpaces*data.verSpace + cards*data.cardWidth))
+        denominator = (data.cardWidth + data.verSpace)
+        col = numerator / denominator
+        for row in xrange(len(data.foundations)):
+            # if blank
+            if (data.foundations[row][col] == [0, ""]):
+                if foundationIsLegal(data, row, col, data.rank, data.suit):
+                    data.foundations[row][col] = [data.rank, data.suit]
+                    # if card is from playing card
+                    if (y1 > data.horSpace+data.cardHeight):
+                        data.playingCards[data.prevRow][data.prevCol] = [0, ""] 
+                    else: # if card is from discard pile
+                        data.discardPile.pop(0) # remove from discard pile
+                    highlightInitFn(data)  
+                    (data.rank, data.suit) = (0, "")            
+                    break
+
+
+
+#############################################################################
+# stack cards in correct order
+
+def playCardIsLegal(data, row, col, rank, suit):
+    prevRank = data.playingCards[row-1][col][0]
+    prevSuit = data.playingCards[row-1][col][1]
+    if (prevSuit == "c" or prevSuit == "s"): # if black
+        if (prevRank == rank+1) and ((suit == "d") or (suit == "h")): 
+            return True
+    else: 
+        if (prevRank == rank+1) and ((suit == "c") or (suit == "s")): 
+            return True
+    return False
+
+def foundationIsLegal(data, row, col, rank, suit):
+    if (row == 0): 
+        if (rank == 1): return True
+        else: highlightInitFn(data) 
+    prevRank = data.foundations[row-1][col][0]
+    prevSuit = data.foundations[row-1][col][1]
+    if (suit == prevSuit) and (rank == prevRank+1): return True
+    return False
+
+##############################################################################
+   
+
+def solitaireDrawFn(canvas, data):
+    drawBoard(canvas, data)
+    drawDeck(canvas, data)
+    drawDiscardPile(canvas, data)
+    drawFoundations(canvas, data)
+    drawPlayingCards(canvas, data)
+    highlightTwoCards(canvas, data)
+    highlightMultipleCards(canvas, data)
+
+def solitaireMouseFn(event, data):
+    (data.x, data.y) = (event.x, event.y)
+    deckMouseFn(event, data)
+    highlightMouseFn(event, data)
+    stackCards(event, data)
+    flipCard(event, data)
+
+
+def playSolitaire():
+    width = 700
+    height = 800
+    eventBasedAnimation.run(
+        initFn=solitaireInitFn,
+        drawFn=solitaireDrawFn,
+        mouseFn=solitaireMouseFn,
+        width=width,
+        height=height,
+        timerDelay=1000
+        )
+
+playSolitaire()
